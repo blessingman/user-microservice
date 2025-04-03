@@ -1,0 +1,49 @@
+services:
+  # Сервис приложения
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: user-microservice
+    ports:
+      - "8080:8080"  # Проброс порта 8080 из контейнера на хост-машину
+    depends_on:
+      postgres:
+        condition: service_healthy  # Запуск только когда Postgres будет готов
+    environment:
+      # Переменные окружения для настройки подключения к БД
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=userservice
+    volumes:
+      - app_logs:/var/log/userservice  # Монтирование тома для хранения логов
+    restart: unless-stopped  # Перезапуск контейнера при ошибках
+
+  # Сервис базы данных PostgreSQL
+  postgres:
+    image: postgres:14-alpine
+    container_name: user-postgres
+    environment:
+      # Настройки базы данных
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=userservice
+    ports:
+      - "5432:5432"  # Проброс порта 5432 для доступа к БД с хоста
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Том для сохранения данных БД
+    healthcheck:
+      # Проверка доступности базы данных
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s  # Время на инициализацию PostgreSQL
+    restart: unless-stopped
+
+# Определение томов для хранения данных
+volumes:
+  postgres_data:  # Том для данных PostgreSQL
+  app_logs:       # Том для логов приложения

@@ -1,0 +1,90 @@
+name: Build and Test
+
+# Триггеры для запуска CI/CD пайплайна
+on:
+  push:
+    branches: [ main ]  # Запускать при пуше в ветку main
+  pull_request:
+    branches: [ main ]  # Запускать при создании PR в ветку main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest  # Выполнять на последней версии Ubuntu
+
+    # Настраиваем сервисы, необходимые для тестирования
+    services:
+      postgres:
+        image: postgres:14-alpine  # Используем PostgreSQL 14 на Alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: userservice
+        ports:
+          - 5432:5432  # Проброс порта PostgreSQL
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      # Шаг 1: Получение кода из репозитория
+      - uses: actions/checkout@v3
+
+      # Шаг 2: Настройка Go версии 1.20
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+
+      # Шаг 3: Сборка Docker образа
+      - name: Build Docker image
+        run: docker build -t user-microservice .
+
+      # Шаг 4: Запуск Docker контейнера для тестирования
+      - name: Run Docker container
+        run: |
+          docker run -d --network host \
+            -e POSTGRES_HOST=localhost \
+            -e POSTGRES_PORT=5432 \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=userservice \
+            --name user-service user-microservice
+          sleep 10  # Даем приложению время на запуск
+
+      # Шаг 5: Тестирование API с помощью curl
+      - name: Test API with curl
+        run: |
+          # Создание пользователя
+          CREATE_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d '{"name":"Test User","email":"test@example.com"}' http://localhost:8080/users)
+          USER_ID=$(echo $CREATE_RESPONSE | jq -r '.id')
+          
+          # Получение пользователя по ID
+          curl -s -X GET http://localhost:8080/users/$USER_ID
+          
+          # Получение всех пользователей
+          curl -s -X GET http://localhost:8080/users
+          
+          # Обновление пользователя
+          curl -s -X PUT -H "Content-Type: application/json" -d '{"name":"Updated User"}' http://localhost:8080/users/$USER_ID
+          
+          # Удаление пользователя
+          curl -s -X DELETE http://localhost:8080/users/$USER_ID
+
+      # Шаг 6: Аутентификация в Docker Hub (только для ветки main)
+      - name: Log in to Docker Hub
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      # Шаг 7: Публикация образа в Docker Hub (только для ветки main)
+      - name: Push to Docker Hub
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/user-microservice:latest
