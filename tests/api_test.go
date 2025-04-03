@@ -15,6 +15,14 @@ import (
 // Базовый URL для тестового API
 var baseURL = "http://localhost:8080"
 
+// Инициализация базового URL из переменных окружения
+func init() {
+	if envURL := os.Getenv("API_URL"); envURL != "" {
+		baseURL = envURL
+		fmt.Printf("Используется URL из переменной окружения: %s\n", baseURL)
+	}
+}
+
 // Структура для хранения созданного пользователя между тестами
 var createdUserID int64
 
@@ -32,19 +40,33 @@ func TestMain(m *testing.M) {
 
 // waitForAPI ожидает, пока API не станет доступным
 func waitForAPI() {
-	maxRetries := 5
-	retryInterval := 2 * time.Second
+	maxRetries := 15                 // Увеличиваем количество попыток
+	retryInterval := 4 * time.Second // Увеличиваем интервал между попытками
+
+	fmt.Println("Ожидание доступности API...")
 
 	for i := 0; i < maxRetries; i++ {
-		_, err := http.Get(fmt.Sprintf("%s/users", baseURL))
+		resp, err := http.Get(fmt.Sprintf("%s/users", baseURL))
 		if err == nil {
-			// API доступен
+			resp.Body.Close()
+			fmt.Println("API доступен!")
 			return
 		}
-		fmt.Printf("API не доступен, ожидание %s...\n", retryInterval)
+
+		// Пробуем альтернативный URL с IP-адресом
+		altURL := "http://127.0.0.1:8080"
+		resp, err = http.Get(fmt.Sprintf("%s/users", altURL))
+		if err == nil {
+			resp.Body.Close()
+			fmt.Println("API доступен через 127.0.0.1!")
+			baseURL = altURL // Переключаемся на рабочий URL
+			return
+		}
+
+		fmt.Printf("Попытка %d/%d: API не доступен, ожидание %s...\n", i+1, maxRetries, retryInterval)
 		time.Sleep(retryInterval)
 	}
-	fmt.Println("API не стал доступным, продолжаем тесты (возможны ошибки)")
+	fmt.Println("API не стал доступным после всех попыток, тесты могут не пройти")
 }
 
 // TestCreateUser проверяет создание пользователя
