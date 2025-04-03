@@ -55,7 +55,7 @@ jobs:
 
       # Шаг 6: Аутентификация в Docker Hub (только для ветки main)
       - name: Log in to Docker Hub
-        if: github.ref == 'refs/heads/default'
+        if: github.ref == 'refs/heads/main'
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
@@ -63,7 +63,7 @@ jobs:
 
       # Шаг 7: Публикация образа в Docker Hub (только для ветки main)
       - name: Push to Docker Hub
-        if: github.ref == 'refs/heads/default'
+        if: github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v4
         with:
           context: .
