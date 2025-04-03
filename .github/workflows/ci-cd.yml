@@ -60,13 +60,12 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-          
+
       # Шаг 7: Публикация образа в Docker Hub
       - name: Push to Docker Hub
         if: github.ref == 'refs/heads/default'
         run: |
           # Тэгирование образа с именем пользователя Docker Hub
-          docker tag user-microservice ${{ secrets.DOCKER_HUB_USERNAME }}/github.com/janson/usermicroservice:latest
+          docker tag user-microservice ${{ secrets.DOCKER_HUB_USERNAME }}/usermicroservice:latest
           # Отправка образа в Docker Hub
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/github.com/janson/usermicroservice:latest
-
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/usermicroservice:latest
