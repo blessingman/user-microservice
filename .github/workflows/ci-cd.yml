@@ -66,6 +66,6 @@ jobs:
         if: github.ref == 'refs/heads/default'
         run: |
           # Тэгирование образа с именем пользователя Docker Hub
-          docker tag user-microservice ${{ secrets.DOCKER_HUB_USERNAME }}/user-microservice:latest
+          docker tag user-microservice "${{ secrets.DOCKER_HUB_USERNAME }}/user-microservice:latest"
           # Отправка образа в Docker Hub
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/:latest
+          docker push "${{ secrets.DOCKER_HUB_USERNAME }}/:latest"
