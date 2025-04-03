@@ -65,7 +65,26 @@ jobs:
       - name: Push to Docker Hub
         if: github.ref == 'refs/heads/default'
         run: |
-          # Тэгирование образа с именем пользователя Docker Hub
-          docker tag user-microservice ${{ secrets.DOCKER_HUB_USERNAME }}/usermicroservice:latest
-          # Отправка образа в Docker Hub
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/usermicroservice:latest
+          # Проверяем, залогинены ли в Docker Hub
+          echo "Checking Docker Hub login status..."
+          docker logout || true
+          echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+
+          # Устанавливаем корректное имя репозитория (простое, без путей)
+          DOCKER_REPO_NAME="user-service"  # Или любое другое простое имя
+          
+          # Тэгируем образ
+          echo "Tagging image..."
+          docker tag user-microservice ${{ secrets.DOCKER_HUB_USERNAME }}/$DOCKER_REPO_NAME:latest
+          
+          # Пробуем сделать push с понятным сообщением об ошибке
+          echo "Pushing to Docker Hub..."
+          if ! docker push ${{ secrets.DOCKER_HUB_USERNAME }}/$DOCKER_REPO_NAME:latest; then
+            echo "::error::Failed to push image. Possible reasons:"
+            echo "::error::1. Repository '$DOCKER_REPO_NAME' doesn't exist in your Docker Hub account"
+            echo "::error::2. Invalid credentials (check DOCKER_HUB_USERNAME and DOCKER_HUB_ACCESS_TOKEN secrets)"
+            echo "::error::3. Docker Hub is down (check status.hub.docker.com)"
+            echo "::error::Please create repository manually at: https://hub.docker.com/repository/create"
+            exit 1
+          fi
+          echo "Image pushed successfully!"   
