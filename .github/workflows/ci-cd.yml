@@ -51,28 +51,39 @@ jobs:
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_DB=userservice \
             --name user-service user-microservice
-          sleep 10  # Даем приложению время на запуск
+          echo "Waiting for container to start up..."
+          sleep 20  # Увеличиваем время ожидания
+          echo "Container status:"
+          docker ps | grep user-service
+          echo "Container logs:"
+          docker logs user-service
 
       # Шаг 5: Тестирование API с помощью curl
       - name: Test API with curl
         run: |
-          # Проверка наличия инструментов
-          which curl || (echo "Installing curl" && sudo apt-get update -qq && sudo apt-get install -qq -y curl)
-          which jq || (echo "Installing jq" && sudo apt-get update -qq && sudo apt-get install -qq -y jq)
+          # Проверяем доступность сервиса
+          echo "Checking if service is available..."
+          curl -v http://localhost:8080/ || echo "Expected 404, continuing..."
           
           # Создание пользователя
-          CREATE_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d '{"name":"Test User","email":"test@example.com"}' http://localhost:8080/users)
-          if [ -z "$CREATE_RESPONSE" ]; then
-            echo "Ошибка: Не удалось создать пользователя"
-            exit 1
-          fi
+          echo "Creating user..."
+          CREATE_RESPONSE=$(curl -v -X POST -H "Content-Type: application/json" -d '{"name":"Test User","email":"test@example.com"}' http://localhost:8080/users)
           echo "Response: $CREATE_RESPONSE"
-          USER_ID=$(echo $CREATE_RESPONSE | jq -r '.id')
-          if [ "$USER_ID" == "null" ]; then
-            echo "Ошибка: Не удалось получить ID пользователя"
+          if [ -z "$CREATE_RESPONSE" ]; then
+            echo "ERROR: No response received"
+            echo "Container logs:"
+            docker logs user-service
             exit 1
           fi
-          echo "Created user with ID: $USER_ID"
+          
+          USER_ID=$(echo $CREATE_RESPONSE | jq -r '.id')
+          echo "Extracted user ID: $USER_ID"
+          if [ "$USER_ID" == "null" ]; then
+            echo "ERROR: Failed to extract user ID from response"
+            echo "Container logs:"
+            docker logs user-service
+            exit 1
+          fi
           
           # Получение пользователя по ID
           curl -s -X GET http://localhost:8080/users/$USER_ID || exit 1
