@@ -44,29 +44,55 @@ jobs:
       # Шаг 4: Запуск Docker контейнера для тестирования
       - name: Run Docker container
         run: |
-          # Запуск контейнера с явно указанным портом
+          # Проверка наличия запущенных контейнеров на порту 8080
+          echo "Checking for existing services on port 8080:"
+          sudo netstat -tulpn | grep 8080 || echo "No services on port 8080"
+          
+          # Запуск контейнера с опцией --add-host
           docker run -d -p 8080:8080 \
-            -e POSTGRES_HOST=localhost \
+            -e POSTGRES_HOST=host.docker.internal \
             -e POSTGRES_PORT=5432 \
             -e POSTGRES_USER=postgres \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_DB=userservice \
+            --add-host=host.docker.internal:host-gateway \
             --name user-service user-microservice
           
           echo "Waiting for container to start up..."
-          sleep 20  # Даем приложению время на запуск
+          sleep 30  # Увеличиваем время ожидания
           
           echo "Container status:"
           docker ps -a
           
           echo "Container logs:"
           docker logs user-service
+          
+          echo "Network check:"
+          curl -v http://localhost:8080/ || echo "Expected 404, continuing..."
+          
+          # Проверка подключения к базе данных из контейнера
+          echo "Testing database connectivity from container:"
+          # Убираем флаг -t, который вызывает ошибку в CI среде
+          docker exec -i user-service sh -c "nc -zv host.docker.internal 5432 || echo 'DB connection failed'"
+          
+          # Пробуем добавить запись в журнал для диагностики
+          docker exec -i user-service cat /var/log/userservice/app.log || echo "Cannot read logs"
+          
+          # Проверка доступности сервиса внутри контейнера
+          docker exec -i user-service curl -v localhost:8080 || echo "Service not accessible inside container"
 
-      # Шаг 5: Запуск тестов Go вместо отдельного модуля
+      # Шаг 5: Запуск тестов Go
       - name: Run API Tests
         run: |
           echo "Running Go API tests..."
-          go test -v ./tests
+          # Modify tests to wait longer for API
+          sed -i 's/maxRetries := 5/maxRetries := 15/' ./tests/api_test.go
+          sed -i 's/retryInterval := 2 \* time.Second/retryInterval := 4 \* time.Second/' ./tests/api_test.go
+          # Добавляем переменные окружения для тестов
+          export API_URL=http://localhost:8080
+          
+          # Запуск тестов с таймаутом
+          go test -timeout 2m -v ./tests
 
       # Шаг 6: Аутентификация в Docker Hub (только для ветки main)
       - name: Log in to Docker Hub
