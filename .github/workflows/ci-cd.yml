@@ -62,15 +62,11 @@ jobs:
           echo "Container logs:"
           docker logs user-service
 
-      # Шаг 5: Запуск тестов Go вместо curl
+      # Шаг 5: Запуск тестов Go вместо отдельного модуля
       - name: Run API Tests
         run: |
           echo "Running Go API tests..."
-          cd tests
-          go mod init tests
-          go mod edit -replace github.com/janson/usermicroservice=../
-          go mod tidy
-          go test -v
+          go test -v ./tests
 
       # Шаг 6: Аутентификация в Docker Hub (только для ветки main)
       - name: Log in to Docker Hub
