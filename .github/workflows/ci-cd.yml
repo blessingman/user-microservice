@@ -53,24 +53,34 @@ jobs:
             --name user-service user-microservice
           sleep 10  # Даем приложению время на запуск
 
-      # Шаг 5: Тестирование API с помощью curl
-      - name: Test API with curl
+      # Шаг 5: Установка необходимых инструментов и тестирование API
+      - name: Install tools and Test API with curl
         run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          
           # Создание пользователя
           CREATE_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d '{"name":"Test User","email":"test@example.com"}' http://localhost:8080/users)
+          if [ -z "$CREATE_RESPONSE" ]; then
+            echo "Ошибка: Не удалось создать пользователя"
+            exit 1
+          fi
           USER_ID=$(echo $CREATE_RESPONSE | jq -r '.id')
+          if [ "$USER_ID" == "null" ]; then
+            echo "Ошибка: Не удалось получить ID пользователя"
+            exit 1
+          fi
           
           # Получение пользователя по ID
-          curl -s -X GET http://localhost:8080/users/$USER_ID
+          curl -s -X GET http://localhost:8080/users/$USER_ID || exit 1
           
           # Получение всех пользователей
-          curl -s -X GET http://localhost:8080/users
+          curl -s -X GET http://localhost:8080/users || exit 1
           
           # Обновление пользователя
-          curl -s -X PUT -H "Content-Type: application/json" -d '{"name":"Updated User"}' http://localhost:8080/users/$USER_ID
+          curl -s -X PUT -H "Content-Type: application/json" -d '{"name":"Updated User"}' http://localhost:8080/users/$USER_ID || exit 1
           
           # Удаление пользователя
-          curl -s -X DELETE http://localhost:8080/users/$USER_ID
+          curl -s -X DELETE http://localhost:8080/users/$USER_ID || exit 1
 
       # Шаг 6: Аутентификация в Docker Hub (только для ветки main)
       - name: Log in to Docker Hub
