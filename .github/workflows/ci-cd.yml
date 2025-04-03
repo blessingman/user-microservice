@@ -3,9 +3,9 @@ name: Build and Test
 # Триггеры для запуска CI/CD пайплайна
 on:
   push:
-    branches: [ main ]  # Запускать при пуше в ветку main
+    branches: [ default ]  # Запускать при пуше в ветку main
   pull_request:
-    branches: [ main ]  # Запускать при создании PR в ветку main
+    branches: [ default ]  # Запускать при создании PR в ветку main
 
 jobs:
   build-and-test:
