@@ -44,28 +44,47 @@ jobs:
       # Шаг 4: Запуск Docker контейнера для тестирования
       - name: Run Docker container
         run: |
-          docker run -d --network host \
-            -e POSTGRES_HOST=localhost \
+          # Запуск контейнера с явно указанным портом
+          docker run -d -p 8080:8080 \
+            -e POSTGRES_HOST=host.docker.internal \
             -e POSTGRES_PORT=5432 \
             -e POSTGRES_USER=postgres \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_DB=userservice \
             --name user-service user-microservice
+          
           echo "Waiting for container to start up..."
           sleep 20  # Увеличиваем время ожидания
+          
           echo "Container status:"
-          docker ps | grep user-service
+          docker ps -a  # Show all containers including stopped ones
+          
           echo "Container logs:"
           docker logs user-service
+          
+          echo "Checking network connectivity:"
+          docker exec user-service ping -c 3 host.docker.internal || echo "Cannot ping host"
+          
+          echo "Checking database connection:"
+          docker exec user-service nc -zv host.docker.internal 5432 || echo "Cannot connect to PostgreSQL"
+          
+          echo "Port binding:"
+          netstat -tulpn | grep 8080 || echo "Port 8080 not bound"
 
-      # Шаг 5: Тестирование API с помощью curl
+      # Шаг 5: Тестирование API с помощью curl с дополнительной диагностикой
       - name: Test API with curl
         run: |
-          # Проверяем доступность сервиса
+          echo "Network interfaces:"
+          ip addr show
+          
+          echo "Port check:"
+          ss -tulwn | grep 8080 || echo "No process listening on port 8080"
+          
           echo "Checking if service is available..."
           curl -v http://localhost:8080/ || echo "Expected 404, continuing..."
+          echo "Trying with host IP..."
+          curl -v http://127.0.0.1:8080/ || echo "Expected 404, continuing..."
           
-          # Создание пользователя
           echo "Creating user..."
           CREATE_RESPONSE=$(curl -v -X POST -H "Content-Type: application/json" -d '{"name":"Test User","email":"test@example.com"}' http://localhost:8080/users)
           echo "Response: $CREATE_RESPONSE"
