@@ -42,12 +42,13 @@ jobs:
       - name: Run Docker container        
         run: |          
           docker run -d --network host \            
+            --name user-service \            
             -e POSTGRES_HOST=localhost \            
             -e POSTGRES_PORT=5432 \            
             -e POSTGRES_USER=postgres \            
             -e POSTGRES_PASSWORD=postgres \            
             -e POSTGRES_DB=userservice \            
-            --name user-service user-microservice          
+            user-microservice          
           sleep 10  # Даем приложению время на запуск      
       # Шаг 5: Запуск Go тестов      
       - name: Run tests        
