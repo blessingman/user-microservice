@@ -34,7 +34,7 @@ jobs:
           go-version: '1.20'      
       # Шаг 3: Сборка Docker образа      
       - name: Build Docker image        
-        run: docker build -t user-microservice --no-cache .      
+        run: docker build -t user-microservice:latest --no-cache .      
       # Шаг 3.1: Проверка наличия Docker образа (необязательный шаг)      
       - name: List Docker images        
         run: docker images      
@@ -48,7 +48,7 @@ jobs:
             -e POSTGRES_USER=postgres \            
             -e POSTGRES_PASSWORD=postgres \            
             -e POSTGRES_DB=userservice \            
-            user-microservice          
+            user-microservice:latest          
           sleep 10  # Даем приложению время на запуск      
       # Шаг 5: Запуск Go тестов      
       - name: Run tests        
