@@ -1,24 +1,26 @@
-name: CI/CD Pipeline
+name: CI
 
+# Триггеры для запуска CI/CD пайплайна
 on:
   push:
-    branches: [ default ]
+    branches: [ default ]  # Запускать при пуше в ветку main
   pull_request:
-    branches: [ default ]
+    branches: [ default ]  # Запускать при создании PR в ветку main
 
 jobs:
-  build-test-and-deploy:
-    runs-on: ubuntu-latest
+  build-and-test:
+    runs-on: ubuntu-latest  # Выполнять на последней версии Ubuntu
 
+    # Настраиваем сервисы, необходимые для тестирования
     services:
       postgres:
-        image: postgres:14-alpine
+        image: postgres:14-alpine  # Используем PostgreSQL 14 на Alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: userservice
         ports:
-          - 5432:5432
+          - 5432:5432  # Проброс порта PostgreSQL
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -26,30 +28,21 @@ jobs:
           --health-retries 5
 
     steps:
-      # 1. Получение кода
+      # Шаг 1: Получение кода из репозитория
       - uses: actions/checkout@v3
 
-      # 2. Настройка Go
+      # Шаг 2: Настройка Go версии 1.20
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.20'
 
-      # 3. Логин в Docker Hub (ранний логин для кэширования)
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+      # Шаг 3: Сборка Docker образа
+      - name: Build Docker image
+        run: docker build -t user-microservice .
 
-      # 4. Сборка Docker образа с тегом
-      - name: Build and tag Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/user-microservice:latest .
-          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/user-microservice:latest ${{ secrets.DOCKER_HUB_USERNAME }}/user-microservice:${{ github.sha }}
-
-      # 5. Запуск контейнера и тестирование
-      - name: Run container and test
+      # Шаг 4: Запуск Docker контейнера для тестирования
+      - name: Run Docker container
         run: |
           docker run -d --network host \
             -e POSTGRES_HOST=localhost \
@@ -57,32 +50,14 @@ jobs:
             -e POSTGRES_USER=postgres \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_DB=userservice \
-            --name user-service ${{ secrets.DOCKER_HUB_USERNAME }}/user-microservice:latest
-          sleep 10
-          # Добавьте здесь ваши тестовые команды
+            --name user-service user-microservice
+          sleep 10  # Даем приложению время на запуск
 
-      # 6. Создание скриншотов (опционально)
-      - name: Capture screenshots
-        if: success()
-        run: |
-          mkdir -p screenshots
-          # Пример для веб-приложения (адаптируйте под ваш случай)
-          docker exec user-service curl -s http://localhost:8080 > screenshots/page.html || echo "Skipping screenshots"
-          tar -czvf screenshots.tar.gz screenshots/
-        continue-on-error: true
-
-      # 7. Загрузка образа в Docker Hub (только для ветки default)
-      - name: Push Docker image
-        if: github.ref == 'refs/heads/default' && success()
-        run: |
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/user-microservice:latest
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/user-microservice:${{ github.sha }}
-
-      # 8. Сохранение артефактов (скриншотов)
-      - name: Upload artifacts
-        if: always()
-        uses: actions/upload-artifact@v3
+      # Шаг 6: Аутентификация в Docker Hub (только для ветки main)
+      - name: Log in to Docker Hub
+        if: github.ref == 'refs/heads/default'
+        uses: docker/login-action@v2
         with:
-          name: deployment-artifacts
-          path: |
-            screenshots.tar.gz
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
