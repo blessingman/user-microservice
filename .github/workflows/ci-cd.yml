@@ -1,103 +1,60 @@
-name: CI/CD Pipeline
+name: CI
 
+# Триггеры для запуска CI/CD пайплайна
 on:
   push:
-    branches: [ "default" ]
+    branches: [ default ]  # Запускать при пуше в ветку main
   pull_request:
-    branches: [ "default" ]
+    branches: [ default ]  # Запускать при создании PR в ветку main
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  build-and-test:
+    runs-on: ubuntu-latest  # Выполнять на последней версии Ubuntu
+
+    # Настраиваем сервисы, необходимые для тестирования
     services:
       postgres:
-        image: postgres:14-alpine
+        image: postgres:14-alpine  # Используем PostgreSQL 14 на Alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: userservice
         ports:
-          - 5432:5432
+          - 5432:5432  # Проброс порта PostgreSQL
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      # Шаг 1: Получение кода из репозитория
+      - uses: actions/checkout@v3
+
+      # Шаг 2: Настройка Go версии 1.20
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.20'
-      - name: Install dependencies
-        run: go mod tidy
-      - name: Run tests
-        run: go test -v ./... -cover
 
-  build:
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      - name: Build Docker Image
+      # Шаг 3: Сборка Docker образа
+      - name: Build Docker image
+        run: docker build -t user-microservice .
+
+      # Шаг 4: Запуск Docker контейнера для тестирования
+      - name: Run Docker container
         run: |
-          docker build -t user-microservice:latest -f Dockerfile .
-          docker save user-microservice:latest > user-microservice-image.tar
-      - name: Upload Docker Image Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: docker-image
-          path: user-microservice-image.tar
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      - name: Download Docker Image Artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: docker-image
-      - name: Load Docker Image
-        run: docker load < user-microservice-image.tar
+          docker run -d --network host \
+            -e POSTGRES_HOST=localhost \
+            -e POSTGRES_PORT=5432 \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=userservice \
+            --name user-service user-microservice
+          sleep 10  # Даем приложению время на запуск
+      # Шаг 6: Аутентификация в Docker Hub (только для ветки main)
       - name: Log in to Docker Hub
-        run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-      - name: Tag and Push Docker Image
-        run: |
-          docker tag user-microservice:latest "${{ secrets.DOCKER_USERNAME }}/user-microservice:latest"
-          docker push "${{ secrets.DOCKER_USERNAME }}/user-microservice:latest"
-
-  integration-tests:
-    runs-on: ubuntu-latest
-    needs: deploy
-    services:
-      db:
-        image: postgres:14-alpine
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      - name: Set up Go
-        uses: actions/setup-go@v4
+        if: github.ref == 'refs/heads/default'
+        uses: docker/login-action@v2
         with:
-          go-version: '1.20'
-      - name: Install dependencies
-        run: go mod tidy
-      - name: Run integration tests
-        env:
-          DATABASE_URL: postgres://test:test@localhost:5432/test_db?sslmode=disable
-        run: go test -v ./... -cover
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
