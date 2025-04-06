@@ -46,7 +46,7 @@ jobs:
           docker build -t user-microservice:latest -f Dockerfile .
           docker save user-microservice:latest > user-microservice-image.tar
       - name: Upload Docker Image Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v3.1.2
         with:
           name: docker-image
           path: user-microservice-image.tar
@@ -58,7 +58,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Download Docker Image Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v3.1.2
         with:
           name: docker-image
       - name: Load Docker Image
