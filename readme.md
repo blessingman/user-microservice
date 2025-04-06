@@ -47,13 +47,8 @@ User Microservice - это REST API для управления пользова
 
 ### Запуск с Docker Compose
 
-1. Клонируйте репозиторий:
-```bash
-git clone <репозиторий>
-cd <директория-проекта>
-```
 
-2. Запустите сервисы с помощью Docker Compose:
+1. Запустите сервисы с помощью Docker Compose:
 ```bash
 docker-compose up -d
 ```
