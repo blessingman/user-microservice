@@ -53,6 +53,10 @@ jobs:
             --name user-service user-microservice
           sleep 10  # Даем приложению время на запуск
 
+      # Шаг 5: Запуск Go тестов
+      - name: Run tests
+        run: go test ./...
+
       # Шаг 6: Аутентификация в Docker Hub (только для ветки main)
       - name: Log in to Docker Hub
         if: github.ref == 'refs/heads/default'
@@ -60,4 +64,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      # Шаг 7: Публикация образа в Docker Hub
+      - name: Push Docker image
+        if: github.ref == 'refs/heads/default'
+        run: |
+          docker tag user-microservice ${{ secrets.DOCKER_HUB_USERNAME }}/user-microservice:latest
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/user-microservice:latest
 
